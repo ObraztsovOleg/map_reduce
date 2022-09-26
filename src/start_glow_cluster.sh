@@ -10,6 +10,8 @@ declare -a pids
 
 declare -r DIRS=("h31" "h55" "h80" "h86")
 
+echo $FILES_NUM
+
 # Function to be called when user press ctrl-c.
 function ctrl_c() {
   for pid in "${pids[@]}"

@@ -5,8 +5,11 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strconv"
 
 	"github.com/gorilla/mux"
+
+	chart "github.com/wcharczuk/go-chart"
 )
 
 var (
@@ -19,13 +22,12 @@ type Data struct {
 	Speed float64
 }
 
-type Time_line struct {
-	User map[string]Data
-}
+var time_line = []float64{0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}
 
 func newRouter() *mux.Router {
 	r := mux.NewRouter()
 	r.HandleFunc("/", handler).Methods("POST")
+	r.HandleFunc("/week_plot", create_plot).Methods("POST")
 
 	return r
 }
@@ -39,6 +41,31 @@ func main() {
 	}
 }
 
+func create_plot(w http.ResponseWriter, r *http.Request) {
+	x := []float64{1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0}
+
+	graph := chart.Chart{
+		Series: []chart.Series{
+			chart.ContinuousSeries{
+				XValues: x,
+				YValues: time_line,
+			},
+		},
+	}
+
+	f, err_f := os.Create("../images/week_plot.png")
+	if err_f != nil {
+		fmt.Println(err_f)
+	}
+
+	defer f.Close()
+
+	err := graph.Render(chart.PNG, f)
+	if err != nil {
+		fmt.Println(err)
+	}
+}
+
 func handler(w http.ResponseWriter, r *http.Request) {
 	var data Data
 
@@ -47,5 +74,12 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		fmt.Println(err)
 	}
 
-	fmt.Println(data)
+	i, err := strconv.Atoi(data.Day)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	time_line[i-1] += data.Speed / float64(20)
+
+	fmt.Println(time_line)
 }
