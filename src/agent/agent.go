@@ -28,7 +28,8 @@ type Time_line struct {
 }
 
 type Data struct {
-	User  string  `json:"User"`
+	User  int     `json:"User"`
+	H     string  `json:"H"`
 	Day   string  `json:"Day"`
 	Speed float64 `json:"Speed"`
 }
@@ -51,12 +52,13 @@ func read_csv_file(file_path string) [][]string {
 	return records
 }
 
-func send_request(user string, day string, speed float64) {
+func send_request(h string, user int, day string, speed float64) {
 	var values Data
 
 	values.Day = day
 	values.User = user
 	values.Speed = speed
+	values.H = h
 
 	json_data, err := json.Marshal(values)
 
@@ -104,19 +106,18 @@ func new_flow(path string, file_name string) {
 		return x
 	}).Map(func(day string, obj Time_line) {
 		speed := obj.Speed / float64(obj.Count)
-		send_request(strings.Split(file_name, ".")[2], obj.Day, speed)
+		str := strings.Split(file_name, ".")
+		user_num := strings.Split(str[2], "u")
+		i, err := strconv.Atoi(user_num[1])
+		if err != nil {
+			fmt.Println(err)
+		}
+
+		send_request(str[1], i, obj.Day, speed)
 	}).Run()
 }
 
 func main() {
-	// json_file, err := os.Open("time.json")
-
-	// if err != nil {
-	// 	fmt.Println(err)
-	// }
-
-	// defer json_file.Close()
-
 	if FOLDER != "master" {
 		files, err := ioutil.ReadDir(DIR + "/" + FOLDER)
 		if err != nil {
@@ -126,31 +127,4 @@ func main() {
 			new_flow(DIR+"/"+FOLDER+"/"+file.Name(), file.Name())
 		}
 	}
-
-	// if os.Args[1] == "master" {
-	// 	fmt.Println(os.Args)
-	// } else {
-	// new_flow(DIR+"/h31/userlog.h31.u13.csv", "userlog.h31.u13.csv")
-	// }
-	// byteValue, _ := ioutil.ReadAll(json_file)
-	// var time_line Time_line
-
-	// content, err := json.Marshal(time_line)
-
-	// json.Unmarshal(byteValue, &time_line)
-
-	// for i := 0; i < len(time_line.Time_line); i++ {
-	// 	fmt.Println("Speed: " + time_line.Time_line[i].Speed)
-	// 	fmt.Println("Number: " + strconv.Itoa(time_line.Time_line[i].Number))
-	// }
-
-	// if files[0] == nil {
-	// 	log.Fatalf("File dose not exist")
-	// }
-
-	// records := read_csv_file(os.Getenv("HOME") + DIR + "/" + files[0].Name())
-	// records = records[1:]
-
-	// fmt.Println(records[0])
-	// new_flow("/home/obrol/Downloads/BigData/Практики/1/v1/userlog.h31.u18.csv")
 }
