@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/gorilla/mux"
 
@@ -35,6 +36,13 @@ var (
 )
 
 var (
+	h31_ud = make([][]float64, 20)
+	h55_ud = make([][]float64, 20)
+	h80_ud = make([][]float64, 20)
+	h86_ud = make([][]float64, 20)
+)
+
+var (
 	h31_u = make([]float64, 20)
 	h55_u = make([]float64, 20)
 	h80_u = make([]float64, 20)
@@ -50,6 +58,13 @@ func newRouter() *mux.Router {
 }
 
 func main() {
+	for i := 0; i < 20; i++ {
+		h31_ud[i] = make([]float64, 7)
+		h55_ud[i] = make([]float64, 7)
+		h80_ud[i] = make([]float64, 7)
+		h86_ud[i] = make([]float64, 7)
+	}
+
 	r := newRouter()
 	err := http.ListenAndServe(":"+SERVERPORT, r)
 
@@ -58,7 +73,15 @@ func main() {
 	}
 }
 
-func plot(x []float64, h []float64, title string) {
+func plot(x []float64, h []float64, title string, create_folder bool) {
+	var object = make([]chart.Tick, len(h))
+
+	for i := 0; i < len(x); i++ {
+		s := strconv.FormatFloat(x[i], 'g', 2, 64)
+		object[i].Value = x[i]
+		object[i].Label = s
+	}
+
 	graph := chart.Chart{
 		Title: title,
 		Background: chart.Style{
@@ -66,6 +89,9 @@ func plot(x []float64, h []float64, title string) {
 				Top:  20,
 				Left: 20,
 			},
+		},
+		XAxis: chart.XAxis{
+			Ticks: object,
 		},
 		Series: []chart.Series{
 			chart.ContinuousSeries{
@@ -80,7 +106,16 @@ func plot(x []float64, h []float64, title string) {
 		chart.Legend(&graph),
 	}
 
-	f, err_f := os.Create("../images/plot_" + title + ".png")
+	path := ""
+	if !create_folder {
+		path = "../images/plot_" + title + ".png"
+	} else {
+		folder := strings.Split(title, "_")
+		path = "../images/" + folder[0] + "/plot_" + title + ".png"
+	}
+
+	f, err_f := os.Create(path)
+
 	if err_f != nil {
 		fmt.Println(err_f)
 	}
@@ -90,6 +125,12 @@ func plot(x []float64, h []float64, title string) {
 	err := graph.Render(chart.PNG, f)
 	if err != nil {
 		fmt.Println(err)
+	}
+}
+
+func plot_ud(x []float64, h_ud [][]float64, title string) {
+	for i := 0; i < 20; i++ {
+		plot(x, h_ud[i], title+"_u"+strconv.Itoa(i), true)
 	}
 }
 
@@ -107,21 +148,29 @@ func create_plot(w http.ResponseWriter, r *http.Request) {
 
 	switch ch := data.Choice; ch {
 	case "h31":
-		plot(x, h31, "week_h31")
+		plot(x, h31, "week_h31", false)
 	case "h55":
-		plot(x, h55, "week_h55")
+		plot(x, h55, "week_h55", false)
 	case "h80":
-		plot(x, h80, "week_h80")
+		plot(x, h80, "week_h80", false)
 	case "h86":
-		plot(x, h86, "week_h86")
+		plot(x, h86, "week_h86", false)
 	case "h31_u":
-		plot(x_u, h31_u, "user_h31")
+		plot(x_u, h31_u, "user_h31", false)
 	case "h55_u":
-		plot(x_u, h55_u, "user_h55")
+		plot(x_u, h55_u, "user_h55", false)
 	case "h80_u":
-		plot(x_u, h80_u, "user_h80")
+		plot(x_u, h80_u, "user_h80", false)
 	case "h86_u":
-		plot(x_u, h86_u, "user_h86")
+		plot(x_u, h86_u, "user_h86", false)
+	case "h31_ud":
+		plot_ud(x, h31_ud, "h31")
+	case "h55_ud":
+		plot_ud(x, h55_ud, "h55")
+	case "h80_ud":
+		plot_ud(x, h31_ud, "h80")
+	case "h86_ud":
+		plot_ud(x, h31_ud, "h86")
 	default:
 		fmt.Println("Error")
 	}
@@ -140,6 +189,15 @@ func addition_u(data Data, h *[]float64) {
 	(*h)[data.User-1] += data.Speed / float64(20)
 }
 
+func addition_ud(data Data, h *[][]float64) {
+	i, err := strconv.Atoi(data.Day)
+	if err != nil {
+		fmt.Println(err)
+	}
+	fmt.Println(data.User-1, i-1)
+	(*h)[data.User-1][i-1] = data.Speed
+}
+
 func handler(w http.ResponseWriter, r *http.Request) {
 	var data Data
 	err := json.NewDecoder(r.Body).Decode(&data)
@@ -151,22 +209,26 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	case "h31":
 		addition(data, &h31)
 		addition_u(data, &h31_u)
+		addition_ud(data, &h31_ud)
 	case "h55":
 		addition(data, &h55)
 		addition_u(data, &h55_u)
+		addition_ud(data, &h31_ud)
 	case "h80":
 		addition(data, &h80)
 		addition_u(data, &h80_u)
+		addition_ud(data, &h31_ud)
 	case "h86":
 		addition(data, &h86)
 		addition_u(data, &h86_u)
+		addition_ud(data, &h31_ud)
 	default:
 		fmt.Println("Error")
 	}
 
-	fmt.Println("h31", h31)
-	fmt.Println("h55", h55)
-	fmt.Println("h80", h80)
-	fmt.Println("h86", h86)
+	fmt.Println("h31", h31_ud)
+	fmt.Println("h55", h55_ud)
+	fmt.Println("h80", h31_ud)
+	fmt.Println("h86", h31_ud)
 	fmt.Println("u", data.User)
 }
