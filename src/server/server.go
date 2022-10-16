@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"os"
 	"strconv"
-	"strings"
 
 	"github.com/gorilla/mux"
 
@@ -18,9 +17,10 @@ var (
 )
 
 type Data struct {
-	User  int
 	H     string
-	Day   string
+	Day   int
+	Time  int
+	User  int
 	Speed float64
 }
 
@@ -29,51 +29,24 @@ type Choice struct {
 }
 
 var (
-	h31 = make([]float64, 7)
-	h55 = make([]float64, 7)
-	h80 = make([]float64, 7)
-	h86 = make([]float64, 7)
+	h31_max = make([]float64, 7)
+	h55_max = make([]float64, 7)
+	h80_max = make([]float64, 7)
+	h86_max = make([]float64, 7)
 )
 
-var (
-	h31_ud = make([][]float64, 20)
-	h55_ud = make([][]float64, 20)
-	h80_ud = make([][]float64, 20)
-	h86_ud = make([][]float64, 20)
-)
-
-var (
-	h31_u = make([]float64, 20)
-	h55_u = make([]float64, 20)
-	h80_u = make([]float64, 20)
-	h86_u = make([]float64, 20)
-)
-
-func newRouter() *mux.Router {
-	r := mux.NewRouter()
-	r.HandleFunc("/", handler).Methods("POST")
-	r.HandleFunc("/week_plot", create_plot).Methods("POST")
-
-	return r
-}
-
-func main() {
-	for i := 0; i < 20; i++ {
-		h31_ud[i] = make([]float64, 7)
-		h55_ud[i] = make([]float64, 7)
-		h80_ud[i] = make([]float64, 7)
-		h86_ud[i] = make([]float64, 7)
+func max(h []float64) float64 {
+	max := 0.0
+	for i := 0; i < len(h); i++ {
+		if max < h[i] {
+			max = h[i]
+		}
 	}
 
-	r := newRouter()
-	err := http.ListenAndServe(":"+SERVERPORT, r)
-
-	if err != nil {
-		fmt.Println(err)
-	}
+	return max
 }
 
-func plot(x []float64, h []float64, title string, create_folder bool) {
+func plot(x []float64, h []float64, title string) {
 	var object = make([]chart.Tick, len(h))
 
 	for i := 0; i < len(x); i++ {
@@ -83,7 +56,7 @@ func plot(x []float64, h []float64, title string, create_folder bool) {
 	}
 
 	graph := chart.Chart{
-		Title: title,
+		Title: "Maximum is " + strconv.FormatFloat(max(h), 'f', 6, 64),
 		Background: chart.Style{
 			Padding: chart.Box{
 				Top:  20,
@@ -106,13 +79,7 @@ func plot(x []float64, h []float64, title string, create_folder bool) {
 		chart.Legend(&graph),
 	}
 
-	path := ""
-	if !create_folder {
-		path = "../images/plot_" + title + ".png"
-	} else {
-		folder := strings.Split(title, "_")
-		path = "../images/" + folder[0] + "/plot_" + title + ".png"
-	}
+	path := "../images/plot_" + title + ".png"
 
 	f, err_f := os.Create(path)
 
@@ -128,18 +95,9 @@ func plot(x []float64, h []float64, title string, create_folder bool) {
 	}
 }
 
-func plot_ud(x []float64, h_ud [][]float64, title string) {
-	for i := 0; i < 20; i++ {
-		plot(x, h_ud[i], title+"_u"+strconv.Itoa(i), true)
-	}
-}
-
 func create_plot(w http.ResponseWriter, r *http.Request) {
 	var data Choice
 	x := []float64{1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0}
-	x_u := []float64{
-		1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0,
-		11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0, 19.0, 20.0}
 
 	req_err := json.NewDecoder(r.Body).Decode(&data)
 	if req_err != nil {
@@ -148,54 +106,16 @@ func create_plot(w http.ResponseWriter, r *http.Request) {
 
 	switch ch := data.Choice; ch {
 	case "h31":
-		plot(x, h31, "week_h31", false)
+		plot(x, h31_max, "max_average_h31")
 	case "h55":
-		plot(x, h55, "week_h55", false)
+		plot(x, h55_max, "max_average_h55")
 	case "h80":
-		plot(x, h80, "week_h80", false)
+		plot(x, h80_max, "max_average_h80")
 	case "h86":
-		plot(x, h86, "week_h86", false)
-	case "h31_u":
-		plot(x_u, h31_u, "user_h31", false)
-	case "h55_u":
-		plot(x_u, h55_u, "user_h55", false)
-	case "h80_u":
-		plot(x_u, h80_u, "user_h80", false)
-	case "h86_u":
-		plot(x_u, h86_u, "user_h86", false)
-	case "h31_ud":
-		plot_ud(x, h31_ud, "h31")
-	case "h55_ud":
-		plot_ud(x, h55_ud, "h55")
-	case "h80_ud":
-		plot_ud(x, h31_ud, "h80")
-	case "h86_ud":
-		plot_ud(x, h31_ud, "h86")
+		plot(x, h86_max, "max_average_h86")
 	default:
 		fmt.Println("Error")
 	}
-}
-
-func addition(data Data, h *[]float64) {
-	i, err := strconv.Atoi(data.Day)
-	if err != nil {
-		fmt.Println(err)
-	}
-
-	(*h)[i-1] += data.Speed / float64(7)
-}
-
-func addition_u(data Data, h *[]float64) {
-	(*h)[data.User-1] += data.Speed / float64(20)
-}
-
-func addition_ud(data Data, h *[][]float64) {
-	i, err := strconv.Atoi(data.Day)
-	if err != nil {
-		fmt.Println(err)
-	}
-	fmt.Println(data.User-1, i-1)
-	(*h)[data.User-1][i-1] = data.Speed
 }
 
 func handler(w http.ResponseWriter, r *http.Request) {
@@ -207,28 +127,40 @@ func handler(w http.ResponseWriter, r *http.Request) {
 
 	switch ch := data.H; ch {
 	case "h31":
-		addition(data, &h31)
-		addition_u(data, &h31_u)
-		addition_ud(data, &h31_ud)
+		if h31_max[data.Day-1] < data.Speed {
+			h31_max[data.Day-1] = data.Speed
+		}
 	case "h55":
-		addition(data, &h55)
-		addition_u(data, &h55_u)
-		addition_ud(data, &h31_ud)
+		if h55_max[data.Day-1] < data.Speed {
+			h55_max[data.Day-1] = data.Speed
+		}
 	case "h80":
-		addition(data, &h80)
-		addition_u(data, &h80_u)
-		addition_ud(data, &h31_ud)
+		if h80_max[data.Day-1] < data.Speed {
+			h80_max[data.Day-1] = data.Speed
+		}
 	case "h86":
-		addition(data, &h86)
-		addition_u(data, &h86_u)
-		addition_ud(data, &h31_ud)
+		if h86_max[data.Day-1] < data.Speed {
+			h86_max[data.Day-1] = data.Speed
+		}
 	default:
 		fmt.Println("Error")
 	}
 
-	fmt.Println("h31", h31_ud)
-	fmt.Println("h55", h55_ud)
-	fmt.Println("h80", h31_ud)
-	fmt.Println("h86", h31_ud)
-	fmt.Println("u", data.User)
+}
+
+func newRouter() *mux.Router {
+	r := mux.NewRouter()
+	r.HandleFunc("/", handler).Methods("POST")
+	r.HandleFunc("/plot", create_plot).Methods("POST")
+
+	return r
+}
+
+func main() {
+	r := newRouter()
+	err := http.ListenAndServe(":"+SERVERPORT, r)
+
+	if err != nil {
+		fmt.Println(err)
+	}
 }

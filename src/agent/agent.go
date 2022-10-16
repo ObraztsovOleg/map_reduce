@@ -22,19 +22,22 @@ var (
 )
 
 type Time_line struct {
-	Day   string
-	Speed float64
-	Count int
+	Day    int64
+	Speed  float64
+	Time   int64
+	Count  int
+	Filter bool
 }
 
 type Data struct {
-	User  int     `json:"User"`
 	H     string  `json:"H"`
-	Day   string  `json:"Day"`
+	Day   int     `json:"Day"`
+	User  int     `json:"User"`
+	Time  int     `json:"Time"`
 	Speed float64 `json:"Speed"`
 }
 
-const DIR = "/home/obrol/Downloads/BigData/Практики/1/v1"
+const DIR = "/home/obrol/Downloads/"
 
 func read_csv_file(file_path string) [][]string {
 	f, err := os.Open(file_path)
@@ -52,13 +55,14 @@ func read_csv_file(file_path string) [][]string {
 	return records
 }
 
-func send_request(h string, user int, day string, speed float64) {
+func send_request(h string, day int, user int, time int, speed float64) {
 	var values Data
 
 	values.Day = day
-	values.User = user
 	values.Speed = speed
+	values.Time = time
 	values.H = h
+	values.User = user
 
 	json_data, err := json.Marshal(values)
 
@@ -74,46 +78,67 @@ func send_request(h string, user int, day string, speed float64) {
 func new_flow(path string, file_name string) {
 	flow.New().TextFile(
 		path, 3,
-	).Filter(func(line string) bool {
-		return !(strings.Contains(line, "Day") ||
-			strings.Contains(line, "obrol-HP-ProBook-430-G5"))
-	}).Map(func(line string, ch chan Time_line) {
+	).Map(func(line string, ch chan Time_line) {
 		var time_line Time_line
-
 		new_line := strings.Split(line, ",")
 
 		for index, elem := range new_line {
 			new_line[index] = strings.Trim(elem, "\t ")
 		}
 
-		float_speed, err := strconv.ParseFloat(new_line[2], 64)
-
+		speed, err := strconv.ParseFloat(new_line[2], 64)
 		if err != nil {
-			fmt.Println(err)
+			time_line.Filter = false
+			ch <- time_line
+			return
 		}
 
-		time_line.Speed = float_speed
-		time_line.Day = new_line[0]
-		time_line.Count = 1
+		time, err := strconv.ParseInt(new_line[1], 10, 64)
+		if err != nil {
+			time_line.Filter = false
+			ch <- time_line
+			return
+		}
 
-		ch <- time_line
+		day, err := strconv.ParseInt(new_line[0], 10, 64)
+		if err != nil {
+			time_line.Filter = false
+			ch <- time_line
+			return
+		}
+
+		if day == 0 {
+			time_line.Filter = false
+			ch <- time_line
+			return
+		} else {
+			time_line.Filter = true
+			time_line.Speed = speed
+			time_line.Time = (day-1)*86400 + time
+			time_line.Day = day
+			time_line.Count = 1
+
+			ch <- time_line
+		}
+	}).Filter(func(src Time_line) bool {
+		return src.Filter
 	}).Map(func(src Time_line) flow.KeyValue {
-		// fmt.Println(src)
-		return flow.KeyValue{src.Day, src}
+		return flow.KeyValue{src.Time, src} // max average speed
 	}).ReduceByKey(func(x Time_line, y Time_line) Time_line {
 		x.Speed = x.Speed + y.Speed
 		x.Count = x.Count + y.Count
 		return x
-	}).Map(func(day string, obj Time_line) {
-		speed := obj.Speed / float64(obj.Count)
+	}).Map(func(time int64, obj Time_line) {
+		avg_speed := obj.Speed / float64(obj.Count)
 		str := strings.Split(file_name, ".")
-		user_num := strings.Split(str[2], "u")
-		i, err := strconv.Atoi(user_num[1])
+		user_str := strings.Split(str[2], "u")
+
+		user, err := strconv.ParseInt(user_str[1], 10, 64)
 		if err != nil {
 			fmt.Println(err)
 		}
 
-		send_request(str[1], i, obj.Day, speed)
+		send_request(str[1], int(obj.Day), int(user), int(obj.Time), avg_speed)
 	}).Run()
 }
 
@@ -127,4 +152,6 @@ func main() {
 			new_flow(DIR+"/"+FOLDER+"/"+file.Name(), file.Name())
 		}
 	}
+
+	fmt.Println("Done")
 }
