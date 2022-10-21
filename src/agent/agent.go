@@ -24,7 +24,7 @@ var (
 type Time_line struct {
 	Day    int64
 	Speed  float64
-	Time   int64
+	Time   string
 	Count  int
 	Filter bool
 }
@@ -33,7 +33,7 @@ type Data struct {
 	H     string  `json:"H"`
 	Day   int     `json:"Day"`
 	User  int     `json:"User"`
-	Time  int     `json:"Time"`
+	Time  string  `json:"Time"`
 	Speed float64 `json:"Speed"`
 }
 
@@ -55,7 +55,7 @@ func read_csv_file(file_path string) [][]string {
 	return records
 }
 
-func send_request(h string, day int, user int, time int, speed float64) {
+func send_request(h string, day int, user int, time string, speed float64) {
 	var values Data
 
 	values.Day = day
@@ -114,7 +114,7 @@ func new_flow(path string, file_name string) {
 		} else {
 			time_line.Filter = true
 			time_line.Speed = speed
-			time_line.Time = (day-1)*86400 + time
+			time_line.Time = strconv.FormatInt((day-1)*86400+time, 10)
 			time_line.Day = day
 			time_line.Count = 1
 
@@ -128,7 +128,7 @@ func new_flow(path string, file_name string) {
 		x.Speed = x.Speed + y.Speed
 		x.Count = x.Count + y.Count
 		return x
-	}).Map(func(time int64, obj Time_line) {
+	}).Map(func(time string, obj Time_line) {
 		avg_speed := obj.Speed / float64(obj.Count)
 		str := strings.Split(file_name, ".")
 		user_str := strings.Split(str[2], "u")
@@ -138,7 +138,7 @@ func new_flow(path string, file_name string) {
 			fmt.Println(err)
 		}
 
-		send_request(str[1], int(obj.Day), int(user), int(obj.Time), avg_speed)
+		send_request(str[1], int(obj.Day), int(user), obj.Time, avg_speed)
 	}).Run()
 }
 
@@ -149,6 +149,7 @@ func main() {
 			log.Fatalf("unable to read dir: %v", err)
 		}
 		for _, file := range files {
+			fmt.Println(file.Name() + " processing...")
 			new_flow(DIR+"/"+FOLDER+"/"+file.Name(), file.Name())
 		}
 	}

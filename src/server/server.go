@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"strconv"
 
 	"github.com/gorilla/mux"
 
@@ -19,7 +18,7 @@ var (
 type Data struct {
 	H     string
 	Day   int
-	Time  int
+	Time  string
 	User  int
 	Speed float64
 }
@@ -29,34 +28,25 @@ type Choice struct {
 }
 
 var (
-	h31_max = make([]float64, 7)
-	h55_max = make([]float64, 7)
-	h80_max = make([]float64, 7)
-	h86_max = make([]float64, 7)
+	h31 = make(map[string]float64)
+	h55 = make(map[string]float64)
+	h80 = make(map[string]float64)
+	h86 = make(map[string]float64)
 )
 
-func max(h []float64) float64 {
-	max := 0.0
-	for i := 0; i < len(h); i++ {
-		if max < h[i] {
-			max = h[i]
-		}
-	}
+var h_max = make([]float64, 4)
 
-	return max
-}
-
-func plot(x []float64, h []float64, title string) {
+func plot(x []string, h []float64, title string) {
 	var object = make([]chart.Tick, len(h))
+	var x_val = []float64{0.0, 1.0, 2.0, 3.0}
 
 	for i := 0; i < len(x); i++ {
-		s := strconv.FormatFloat(x[i], 'g', 2, 64)
-		object[i].Value = x[i]
-		object[i].Label = s
+		object[i].Value = float64(i)
+		object[i].Label = x[i]
 	}
 
 	graph := chart.Chart{
-		Title: "Maximum is " + strconv.FormatFloat(max(h), 'f', 6, 64),
+		Title: title,
 		Background: chart.Style{
 			Padding: chart.Box{
 				Top:  20,
@@ -69,7 +59,7 @@ func plot(x []float64, h []float64, title string) {
 		Series: []chart.Series{
 			chart.ContinuousSeries{
 				Name:    title,
-				XValues: x,
+				XValues: x_val,
 				YValues: h,
 			},
 		},
@@ -97,25 +87,33 @@ func plot(x []float64, h []float64, title string) {
 
 func create_plot(w http.ResponseWriter, r *http.Request) {
 	var data Choice
-	x := []float64{1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0}
+	x := []string{"h31", "h55", "h80", "h86"}
+	h_max[0] = max(h31) / 20.0
+	h_max[1] = max(h55) / 20.0
+	h_max[2] = max(h80) / 20.0
+	h_max[3] = max(h86) / 20.0
 
 	req_err := json.NewDecoder(r.Body).Decode(&data)
 	if req_err != nil {
 		fmt.Println(req_err)
 	}
 
-	switch ch := data.Choice; ch {
-	case "h31":
-		plot(x, h31_max, "max_average_h31")
-	case "h55":
-		plot(x, h55_max, "max_average_h55")
-	case "h80":
-		plot(x, h80_max, "max_average_h80")
-	case "h86":
-		plot(x, h86_max, "max_average_h86")
-	default:
-		fmt.Println("Error")
+	plot(x, h_max, "max_average_h")
+	for i := 0; i < len(x); i++ {
+		fmt.Printf("%s - %.7f\n", x[i], h_max[i])
 	}
+}
+
+func max(h map[string]float64) float64 {
+	max := 0.0
+
+	for key := range h {
+		if max < h[key] {
+			max = h[key]
+		}
+	}
+
+	return max
 }
 
 func handler(w http.ResponseWriter, r *http.Request) {
@@ -127,31 +125,22 @@ func handler(w http.ResponseWriter, r *http.Request) {
 
 	switch ch := data.H; ch {
 	case "h31":
-		if h31_max[data.Day-1] < data.Speed {
-			h31_max[data.Day-1] = data.Speed
-		}
+		h31[data.Time] = h31[data.Time] + data.Speed
 	case "h55":
-		if h55_max[data.Day-1] < data.Speed {
-			h55_max[data.Day-1] = data.Speed
-		}
+		h55[data.Time] = h55[data.Time] + data.Speed
 	case "h80":
-		if h80_max[data.Day-1] < data.Speed {
-			h80_max[data.Day-1] = data.Speed
-		}
+		h80[data.Time] = h80[data.Time] + data.Speed
 	case "h86":
-		if h86_max[data.Day-1] < data.Speed {
-			h86_max[data.Day-1] = data.Speed
-		}
+		h86[data.Time] = h86[data.Time] + data.Speed
 	default:
 		fmt.Println("Error")
 	}
-
 }
 
 func newRouter() *mux.Router {
 	r := mux.NewRouter()
 	r.HandleFunc("/", handler).Methods("POST")
-	r.HandleFunc("/plot", create_plot).Methods("POST")
+	r.HandleFunc("/plot", create_plot).Methods("GET")
 
 	return r
 }
