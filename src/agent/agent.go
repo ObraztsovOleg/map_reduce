@@ -32,7 +32,7 @@ type Time_line struct {
 type Data struct {
 	H     string  `json:"H"`
 	Day   int     `json:"Day"`
-	User  int     `json:"User"`
+	User  string  `json:"User"`
 	Time  string  `json:"Time"`
 	Speed float64 `json:"Speed"`
 }
@@ -55,7 +55,7 @@ func read_csv_file(file_path string) [][]string {
 	return records
 }
 
-func send_request(h string, day int, user int, time string, speed float64) {
+func send_request(h string, day int, user string, time string, speed float64) {
 	var values Data
 
 	values.Day = day
@@ -131,14 +131,8 @@ func new_flow(path string, file_name string) {
 	}).Map(func(time string, obj Time_line) {
 		avg_speed := obj.Speed / float64(obj.Count)
 		str := strings.Split(file_name, ".")
-		user_str := strings.Split(str[2], "u")
 
-		user, err := strconv.ParseInt(user_str[1], 10, 64)
-		if err != nil {
-			fmt.Println(err)
-		}
-
-		send_request(str[1], int(obj.Day), int(user), obj.Time, avg_speed)
+		send_request(str[1], int(obj.Day), str[2], obj.Time, avg_speed)
 	}).Run()
 }
 
