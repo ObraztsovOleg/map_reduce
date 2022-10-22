@@ -40,18 +40,6 @@
 
 ## Solution
 
-![image](./src/images/plot_user_h31.png)
+![image](./src/images/avg_speed.png)
 
-![image](./src/images/plot_user_h55.png)
-
-![image](./src/images/plot_user_h80.png)
-
-![image](./src/images/plot_user_h86.png)
-
-![image](./src/images/plot_week_h31.png)
-
-![image](./src/images/plot_week_h55.png)
-
-![image](./src/images/plot_week_h80.png)
-
-![image](./src/images/plot_week_h86.png)
+![image](./src/images/plot_max_average_h.png)
