@@ -19,7 +19,7 @@ type Data struct {
 	H     string
 	Day   int
 	Time  string
-	User  string
+	Count int
 	Speed float64
 }
 
@@ -32,10 +32,10 @@ var (
 	h55       = make(map[string]float64)
 	h80       = make(map[string]float64)
 	h86       = make(map[string]float64)
-	users_h31 = make(map[string]int)
-	users_h55 = make(map[string]int)
-	users_h80 = make(map[string]int)
-	users_h86 = make(map[string]int)
+	count_h31 = make(map[string]int)
+	count_h55 = make(map[string]int)
+	count_h80 = make(map[string]int)
+	count_h86 = make(map[string]int)
 )
 
 var h_max = make([]float64, 4)
@@ -92,10 +92,11 @@ func plot(x []string, h []float64, title string) {
 func create_plot(w http.ResponseWriter, r *http.Request) {
 	var data Choice
 	x := []string{"h31", "h55", "h80", "h86"}
-	h_max[0] = max(h31) / float64(len(users_h31))
-	h_max[1] = max(h55) / float64(len(users_h55))
-	h_max[2] = max(h80) / float64(len(users_h80))
-	h_max[3] = max(h86) / float64(len(users_h86))
+
+	h_max[0] = max_avg(h31, count_h31)
+	h_max[1] = max_avg(h55, count_h55)
+	h_max[2] = max_avg(h80, count_h80)
+	h_max[3] = max_avg(h86, count_h86)
 
 	req_err := json.NewDecoder(r.Body).Decode(&data)
 	if req_err != nil {
@@ -106,19 +107,16 @@ func create_plot(w http.ResponseWriter, r *http.Request) {
 	for i := 0; i < len(x); i++ {
 		fmt.Printf("%s - %.7f\n", x[i], h_max[i])
 	}
-
-	fmt.Println("User h31 number - ", len(users_h31))
-	fmt.Println("User h55 number - ", len(users_h55))
-	fmt.Println("User h80 number - ", len(users_h80))
-	fmt.Println("User h86 number - ", len(users_h86))
 }
 
-func max(h map[string]float64) float64 {
+func max_avg(h map[string]float64, count_h map[string]int) float64 {
 	max := 0.0
 
 	for key := range h {
-		if max < h[key] {
-			max = h[key]
+		avg := h[key] / float64(count_h[key])
+
+		if max < avg {
+			max = avg
 		}
 	}
 
@@ -135,16 +133,16 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	switch ch := data.H; ch {
 	case "h31":
 		h31[data.Time] = h31[data.Time] + data.Speed
-		users_h31[data.User] = 1
+		count_h31[data.Time] = count_h31[data.Time] + data.Count
 	case "h55":
 		h55[data.Time] = h55[data.Time] + data.Speed
-		users_h55[data.User] = 1
+		count_h55[data.Time] = count_h55[data.Time] + data.Count
 	case "h80":
 		h80[data.Time] = h80[data.Time] + data.Speed
-		users_h80[data.User] = 1
+		count_h80[data.Time] = count_h80[data.Time] + data.Count
 	case "h86":
 		h86[data.Time] = h86[data.Time] + data.Speed
-		users_h86[data.User] = 1
+		count_h86[data.Time] = count_h86[data.Time] + data.Count
 	default:
 		fmt.Println("Error")
 	}

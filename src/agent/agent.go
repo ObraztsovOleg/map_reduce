@@ -32,12 +32,12 @@ type Time_line struct {
 type Data struct {
 	H     string  `json:"H"`
 	Day   int     `json:"Day"`
-	User  string  `json:"User"`
+	Count int     `json:"Count"`
 	Time  string  `json:"Time"`
 	Speed float64 `json:"Speed"`
 }
 
-const DIR = "/home/obrol/Downloads/"
+const DIR = "/home/obrol/Downloads"
 
 func read_csv_file(file_path string) [][]string {
 	f, err := os.Open(file_path)
@@ -55,14 +55,14 @@ func read_csv_file(file_path string) [][]string {
 	return records
 }
 
-func send_request(h string, day int, user string, time string, speed float64) {
+func send_request(h string, day int, count int, time string, speed float64) {
 	var values Data
 
 	values.Day = day
 	values.Speed = speed
 	values.Time = time
 	values.H = h
-	values.User = user
+	values.Count = count
 
 	json_data, err := json.Marshal(values)
 
@@ -122,17 +122,10 @@ func new_flow(path string, file_name string) {
 		}
 	}).Filter(func(src Time_line) bool {
 		return src.Filter
-	}).Map(func(src Time_line) flow.KeyValue {
-		return flow.KeyValue{src.Time, src} // max average speed
-	}).ReduceByKey(func(x Time_line, y Time_line) Time_line {
-		x.Speed = x.Speed + y.Speed
-		x.Count = x.Count + y.Count
-		return x
-	}).Map(func(time string, obj Time_line) {
-		avg_speed := obj.Speed / float64(obj.Count)
+	}).Map(func(obj Time_line) {
 		str := strings.Split(file_name, ".")
 
-		send_request(str[1], int(obj.Day), str[2], obj.Time, avg_speed)
+		send_request(str[1], int(obj.Day), obj.Count, obj.Time, obj.Speed)
 	}).Run()
 }
 
